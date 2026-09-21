@@ -1,0 +1,18 @@
+.idea/
+.vs/
+*.user
+
+bin/
+obj/
+
+.DS_Store
+*.DS_Store
+
+MadMax Reborn.app/
+MadMax Reborn Windows/
+ReleaseBuild/
+temp_*/
+*.zip
+
+GAMESAVE*
+appsettings.*
