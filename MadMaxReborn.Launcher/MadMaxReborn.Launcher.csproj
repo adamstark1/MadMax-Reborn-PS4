@@ -7,6 +7,8 @@
     <Product>MadMax Reborn Launcher</Product>
     <AssemblyTitle>MadMax Reborn Launcher</AssemblyTitle>
     <Title>MadMax Reborn Launcher</Title>
+    
+    <AssemblyName>MadMaxRebornApp</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,5 +24,9 @@
     <PackageReference Include="Avalonia.Diagnostics" Version="11.0.10" Condition="'$(Configuration)' == 'Debug'" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
   </ItemGroup>
-
+  
+  <ItemGroup>
+    <Compile Include="..\Models\*.cs" Link="Models\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\*.cs" Link="Services\%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>
