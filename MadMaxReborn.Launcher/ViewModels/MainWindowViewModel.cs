@@ -50,6 +50,7 @@ public partial class MainWindowViewModel : ObservableObject
     
     private CancellationTokenSource? _githubPollingCts;
     private CancellationTokenSource? _waitCts;
+    private string? _cachedAccessToken;
 
     private double _requiredWaitHours;
     private string? _cachedDeviceCode;
@@ -348,19 +349,34 @@ public partial class MainWindowViewModel : ObservableObject
         {
             using var client = new HttpClient();
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-            client.DefaultRequestHeaders.Add("User-Agent", "MadMaxReborn-App");
+
+            if (!string.IsNullOrEmpty(_cachedAccessToken))
+            {
+                using var authClient = new HttpClient();
+                authClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_cachedAccessToken}");
+                authClient.DefaultRequestHeaders.Add("User-Agent", "MadMaxReborn-App");
+
+                var starResp = await authClient.GetAsync("https://api.github.com/user/starred/adamstark1/MadMax-Reborn-PS4");
+                
+                if (starResp.StatusCode == System.Net.HttpStatusCode.NoContent)
+                {
+                    return true;
+                }
+                if (starResp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    _cachedAccessToken = null;
+                }
+                else
+                {
+                    return false;
+                }
+            }
 
             if (string.IsNullOrEmpty(_cachedDeviceCode) || DateTime.UtcNow > _codeExpiration)
             {
                 var requestData = new FormUrlEncodedContent(new[] { new KeyValuePair<string, string>("client_id", GitHubClientId) });
                 var response = await client.PostAsync("https://github.com/login/device/code", requestData);
-                
-                if (!response.IsSuccessStatusCode)
-                {
-                    string errorDetails = await response.Content.ReadAsStringAsync();
-                    Log($"[AUTH ERROR] GitHub API refused the request. Status: {response.StatusCode}. Details: {errorDetails}");
-                    return false;
-                }
+                if (!response.IsSuccessStatusCode) return false;
 
                 var json = await response.Content.ReadAsStringAsync();
                 using var doc = JsonDocument.Parse(json);
@@ -401,19 +417,28 @@ public partial class MainWindowViewModel : ObservableObject
                     break;
                 }
                 if (pollJson.Contains("authorization_pending")) continue;
-                if (pollJson.Contains("slow_down")) { _cachedInterval += 5; continue; }
+                if (pollJson.Contains("slow_down"))
+                {
+                    _cachedInterval += 5;
+                    continue;
+                }
+                
+                _cachedDeviceCode = null;
                 break;
             }
 
             IsGithubPopupVisible = false;
+
             if (string.IsNullOrEmpty(accessToken)) return false;
 
-            using var authClient = new HttpClient();
-            authClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
-            authClient.DefaultRequestHeaders.Add("User-Agent", "MadMaxReborn-App");
+            _cachedAccessToken = accessToken;
 
-            var starResp = await authClient.GetAsync("https://api.github.com/user/starred/adamstark1/MadMax-Reborn-PS4");
-            return starResp.StatusCode == System.Net.HttpStatusCode.NoContent;
+            using var authClient2 = new HttpClient();
+            authClient2.DefaultRequestHeaders.Add("Authorization", $"Bearer {_cachedAccessToken}");
+            authClient2.DefaultRequestHeaders.Add("User-Agent", "MadMaxReborn-App");
+
+            var starResp2 = await authClient2.GetAsync("https://api.github.com/user/starred/adamstark1/MadMax-Reborn-PS4");
+            return starResp2.StatusCode == System.Net.HttpStatusCode.NoContent;
         }
         catch (TaskCanceledException)
         {
@@ -426,7 +451,7 @@ public partial class MainWindowViewModel : ObservableObject
             return false;
         }
     }
-    
+
     private void PatchSaveFileCompleted()
     {
         try
@@ -444,6 +469,10 @@ public partial class MainWindowViewModel : ObservableObject
                 bytes[posPenny + 5] = 0x01;
                 bytes[posPenny + 6] = 0x00;
                 bytes[posPenny + 7] = 0x00;
+                bytes[posPenny + 8] = 0x2D;
+                bytes[posPenny + 9] = 0x81;
+                bytes[posPenny + 10] = 0x54;
+                bytes[posPenny + 11] = 0xEA;
             }
 
             int posDiv = FindPattern(bytes, DividendHash);
@@ -457,6 +486,10 @@ public partial class MainWindowViewModel : ObservableObject
                 bytes[posDiv + 5] = 0x07;
                 bytes[posDiv + 6] = 0x00;
                 bytes[posDiv + 7] = 0x00;
+                bytes[posDiv + 8] = 0x2D;
+                bytes[posDiv + 9] = 0x81;
+                bytes[posDiv + 10] = 0x54;
+                bytes[posDiv + 11] = 0xEA;
             }
 
             File.WriteAllBytes(_selectedFilePath, bytes);
